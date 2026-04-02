@@ -1,0 +1,65 @@
+{
+  "name": "NeverMiss Email Outreach",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "hours", "hours": 1}]
+        }
+      },
+      "id": "trigger",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM leads WHERE status = 'new' ORDER BY created_at ASC LIMIT 10"
+      },
+      "id": "get-leads",
+      "name": "Get New Leads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail",
+        "fromEmail": "sales@nevermiss.ai",
+        "to": "{{ $json.email }}",
+        "subject": "NeverMiss - Never Miss Another Call",
+        "text": "Hi {{ $json.name }},\n\nI help contractors like you never miss a call. Our AI-powered missed call text-back service gets customers back instantly.\n\nOne saved lead pays for the service 10x over.\n\nWant a quick demo?\n\nBest,\nQuenton\nNeverMiss.ai",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send Outreach Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 4,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads SET status = 'email_sent', updated_at = NOW() WHERE id = {{ $json.id }}"
+      },
+      "id": "update-status",
+      "name": "Mark as Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [[{"node": "Get New Leads", "type": "main", "index": 0}]]
+    },
+    "Get New Leads": {
+      "main": [[{"node": "Send Outreach Email", "type": "main", "index": 0}]]
+    },
+    "Send Outreach Email": {
+      "main": [[{"node": "Mark as Sent", "type": "main", "index": 0}]]
+    }
+  }
+}

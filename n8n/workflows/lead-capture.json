@@ -1,0 +1,80 @@
+{
+  "name": "NeverMiss Lead Capture",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "minutes", "minutes": 15}]
+        }
+      },
+      "id": "scheduler",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.apollo.io/api/v1/mixed_people/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "q_keywords", "value": "plumber"},
+            {"name": "location", "value": "Dallas, TX"},
+            {"name": "page", "value": 1}
+          ]
+        },
+        "options": {}
+      },
+      "id": "apollo-fetch",
+      "name": "Fetch Leads from Apollo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const leads = $input.first().json.persons || [];\nconst processed = leads.map(lead => ({\n  name: lead.name,\n  email: lead.email,\n  company: lead.organization?.name,\n  phone: lead.phone_numbers?.[0]?.phone_number,\n  source: 'apollo',\n  status: 'new'\n}));\n\nreturn { json: { leads: processed } };"
+      },
+      "id": "process-leads",
+      "name": "Process Leads",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "leads",
+        "columns": {
+          "name": "{{ $json.name }}",
+          "email": "{{ $json.email }}",
+          "phone": "{{ $json.phone }}",
+          "company": "{{ $json.company }}",
+          "source": "{{ $json.source }}",
+          "status": "{{ $json.status }}",
+          "created_at": "{{ $now }}"
+        }
+      },
+      "id": "save-leads",
+      "name": "Save to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{"node": "Fetch Leads from Apollo", "type": "main", "index": 0}]]
+    },
+    "Fetch Leads from Apollo": {
+      "main": [[{"node": "Process Leads", "type": "main", "index": 0}]]
+    },
+    "Process Leads": {
+      "main": [[{"node": "Save to Database", "type": "main", "index": 0}]]
+    }
+  }
+}

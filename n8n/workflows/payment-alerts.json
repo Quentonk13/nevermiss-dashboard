@@ -1,0 +1,90 @@
+{
+  "name": "NeverMiss Payment Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-webhook",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Stripe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "nevermiss-stripe"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value": "{{ $json.type }}"
+            }
+          ],
+          "operator": "contains",
+          "compareValue": "payment_intent.succeeded"
+        }
+      },
+      "id": "filter-success",
+      "name": "Payment Success?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail",
+        "fromEmail": "alerts@nevermiss.ai",
+        "to": "quenton@nevermiss.ai",
+        "subject": "💰 Payment Received - NeverMiss",
+        "text": "New payment received!\n\nAmount: ${{ $json.data.object.amount / 100 }}\nCustomer: {{ $json.data.object.customer_email }}\n\nInvoice: {{ $json.data.object.invoice }}",
+        "options": {}
+      },
+      "id": "email-alert",
+      "name": "Email Quenton",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 4,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO revenue (amount, customer_email, stripe_invoice, created_at) VALUES ({{ $json.data.object.amount / 100 }}, '{{ $json.data.object.customer_email }}', '{{ $json.data.object.invoice }}', NOW())"
+      },
+      "id": "log-revenue",
+      "name": "Log Revenue",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail",
+        "fromEmail": "sales@nevermiss.ai",
+        "to": "{{ $json.data.object.customer_email }}",
+        "subject": "Welcome to NeverMiss!",
+        "text": "Thanks for subscribing!\n\nYou now have missed-call text-back activated. Setup takes 5 minutes.\n\nReply to this email if you need help.\n\nBest,\nNeverMiss Team",
+        "options": {}
+      },
+      "id": "welcome-email",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 4,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Stripe Webhook": {
+      "main": [[{"node": "Payment Success?", "type": "main", "index": 0}]]
+    },
+    "Payment Success?": {
+      "main": [
+        [{"node": "Email Quenton", "type": "main", "index": 0}],
+        [{"node": "Log Revenue", "type": "main", "index": 0}],
+        [{"node": "Send Welcome Email", "type": "main", "index": 0}]
+      ]
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "name": "NeverMiss Social Poster",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "hours", "hours": 4}]
+        }
+      },
+      "id": "trigger",
+      "name": "Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM content_queue WHERE status = 'pending' ORDER BY scheduled_at ASC LIMIT 1"
+      },
+      "id": "get-content",
+      "name": "Get Next Post",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "text": "{{ $json.content }}",
+        "addPayload": true
+      },
+      "id": "post-twitter",
+      "name": "Post to Twitter",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 3,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "text": "{{ $json.content }}",
+        "addPayload": true
+      },
+      "id": "post-bluesky",
+      "name": "Post to Bluesky",
+      "type": "n8n-nodes-base.bluesky",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE content_queue SET status = 'posted', posted_at = NOW() WHERE id = {{ $json.id }}"
+      },
+      "id": "mark-posted",
+      "name": "Mark as Posted",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Every 4 Hours": {
+      "main": [[{"node": "Get Next Post", "type": "main", "index": 0}]]
+    },
+    "Get Next Post": {
+      "main": [
+        [{"node": "Post to Twitter", "type": "main", "index": 0}],
+        [{"node": "Post to Bluesky", "type": "main", "index": 0}]
+      ]
+    },
+    "Post to Twitter": {
+      "main": [[{"node": "Mark as Posted", "type": "main", "index": 0}]]
+    },
+    "Post to Bluesky": {
+      "main": [[{"node": "Mark as Posted", "type": "main", "index": 0}]]
+    }
+  }
+}

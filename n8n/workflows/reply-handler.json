@@ -1,0 +1,131 @@
+{
+  "name": "NeverMiss Lead Response",
+  "nodes": [
+    {
+      "parameters": {
+        "mailbox": "inbox@nevermiss.ai",
+        "postProcessAction": "leave",
+        "options": {
+          "scope": "new"
+        }
+      },
+      "id": "gmail-trigger",
+      "name": "New Email Received",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value": "{{ $json.subject }}"
+            }
+          ],
+          "operator": "contains",
+          "compareValue": "demo"
+        }
+      },
+      "id": "filter-demo",
+      "name": "Wants Demo?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [450, 150]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value": "{{ $json.subject }}"
+            }
+          ],
+          "operator": "contains",
+          "compareValue": "interested"
+        }
+      },
+      "id": "filter-interested",
+      "name": "Is Interested?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [450, 450]
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail",
+        "fromEmail": "sales@nevermiss.ai",
+        "to": "{{ $json.from[0].address }}",
+        "subject": "Re: {{ $json.subject }}",
+        "text": "Thanks for your interest! \n\nLet's schedule a 15-min demo. Book a time here: https://calendly.com/quenton-nevermiss\n\nOr reply with your preferred time.",
+        "options": {}
+      },
+      "id": "demo-response",
+      "name": "Send Demo Link",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 4,
+      "position": [650, 150]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads SET status = 'demo_requested', updated_at = NOW() WHERE email = '{{ $json.from[0].address }}'"
+      },
+      "id": "update-lead",
+      "name": "Update Lead Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 150]
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail",
+        "fromEmail": "sales@nevermiss.ai",
+        "to": "{{ $json.from[0].address }}",
+        "subject": "Re: {{ $json.subject }}",
+        "text": "Thanks for reaching out! I'd love to learn more about your needs.\n\nCan you tell me:\n1. How many calls do you miss per day?\n2. What's your biggest frustration with missed calls?\n\nHappy to chat whenever works for you.",
+        "options": {}
+      },
+      "id": "interested-response",
+      "name": "Personal Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 4,
+      "position": [650, 450]
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail",
+        "fromEmail": "alerts@nevermiss.ai",
+        "to": "quenton@nevermiss.ai",
+        "subject": "🔥 Hot Lead: {{ $json.from[0].address }}",
+        "text": "Lead is interested!\n\nFrom: {{ $json.from[0].address }}\nSubject: {{ $json.subject }}\nBody: {{ $json.text }}",
+        "options": {}
+      },
+      "id": "alert-quenton",
+      "name": "Alert Quenton",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 4,
+      "position": [850, 450]
+    }
+  ],
+  "connections": {
+    "New Email Received": {
+      "main": [
+        [{"node": "Wants Demo?", "type": "main", "index": 0}],
+        [{"node": "Is Interested?", "type": "main", "index": 0}]
+      ]
+    },
+    "Wants Demo?": {
+      "main": [[{"node": "Send Demo Link", "type": "main", "index": 0}]]
+    },
+    "Send Demo Link": {
+      "main": [[{"node": "Update Lead Status", "type": "main", "index": 0}]]
+    },
+    "Is Interested?": {
+      "main": [
+        [{"node": "Personal Reply", "type": "main", "index": 0}],
+        [{"node": "Alert Quenton", "type": "main", "index": 0}]
+      ]
+    }
+  }
+}
